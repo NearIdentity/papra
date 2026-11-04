@@ -260,5 +260,88 @@ describe('auto-tagging.models', () => {
         });
       });
     });
+
+    describe('proposed new tags are reconciled with the existing tags', () => {
+      const existingTags = [
+        { id: 'tag_1', name: 'Finance' },
+        { id: 'tag_2', name: 'Home Insurance' },
+      ];
+
+      test('a new tag matching an existing tag, ignoring case, surrounding spaces and repeated spaces, is mapped to the existing tag id instead of being created', () => {
+        expect(
+          getTagsActions({
+            autoTaggingResponse: {
+              newTags: [{ name: '  fINANCE ' }, { name: 'home    insurance' }, { name: 'Travel' }],
+            },
+            existingTags,
+            maxTags: 5,
+          }),
+        ).to.eql({
+          tagIdsToAdd: ['tag_1', 'tag_2'],
+          tagsToCreate: [{ name: 'Travel' }],
+        });
+      });
+
+      test('a new tag mapped to an existing tag already selected by the AI is not added twice', () => {
+        expect(
+          getTagsActions({
+            autoTaggingResponse: { existingTags: ['Finance'], newTags: [{ name: 'finance' }] },
+            existingTags,
+            maxTags: 5,
+          }),
+        ).to.eql({ tagIdsToAdd: ['tag_1'], tagsToCreate: [] });
+      });
+
+      test('new tags duplicating each other, ignoring case and spaces, only keep the first one', () => {
+        expect(
+          getTagsActions({
+            autoTaggingResponse: {
+              newTags: [
+                { name: 'Invoice', description: 'first' },
+                { name: ' invoice ', description: 'second' },
+                { name: 'INVOICE' },
+              ],
+            },
+            existingTags: [],
+            maxTags: 5,
+          }),
+        ).to.eql({
+          tagIdsToAdd: [],
+          tagsToCreate: [{ name: 'Invoice', description: 'first' }],
+        });
+      });
+
+      test('new tags with an empty or blank name are dropped', () => {
+        expect(
+          getTagsActions({
+            autoTaggingResponse: { newTags: [{ name: '' }, { name: '   ' }, { name: 'Invoice' }] },
+            existingTags,
+            maxTags: 5,
+          }),
+        ).to.eql({ tagIdsToAdd: [], tagsToCreate: [{ name: 'Invoice' }] });
+      });
+
+      test('the maxTags cap applies to the combined mapped and created tags, and dropped or duplicate proposals do not use up slots', () => {
+        expect(
+          getTagsActions({
+            autoTaggingResponse: {
+              newTags: [
+                { name: '' },
+                { name: 'finance' },
+                { name: 'A' },
+                { name: 'a' },
+                { name: 'B' },
+                { name: 'C' },
+              ],
+            },
+            existingTags,
+            maxTags: 3,
+          }),
+        ).to.eql({
+          tagIdsToAdd: ['tag_1'],
+          tagsToCreate: [{ name: 'A' }, { name: 'B' }],
+        });
+      });
+    });
   });
 });

@@ -88,6 +88,10 @@ export type AutoTaggingActions = {
   tagsToCreate: { name: string; description?: string }[];
 };
 
+function normalizeTagName(name: string) {
+  return name.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 export function getTagsActions({
   autoTaggingResponse,
   existingTags,
@@ -100,12 +104,41 @@ export function getTagsActions({
   const { existingTags: requestedExistingTagNames = [], newTags = [] } = autoTaggingResponse;
 
   const existingTagNamesMap = new Map(existingTags.map((tag) => [tag.name, tag.id]));
+  const existingTagIdsByNormalizedName = new Map<string, string>();
+  for (const tag of existingTags) {
+    const normalizedName = normalizeTagName(tag.name);
+    if (!existingTagIdsByNormalizedName.has(normalizedName)) {
+      existingTagIdsByNormalizedName.set(normalizedName, tag.id);
+    }
+  }
 
-  const tagIdsToAdd = uniq(
-    requestedExistingTagNames.map((tagName) => existingTagNamesMap.get(tagName)).filter(Boolean),
-  ).slice(0, maxTags);
+  const requestedTagIds = requestedExistingTagNames
+    .map((tagName) => existingTagNamesMap.get(tagName))
+    .filter(Boolean);
 
-  const tagsToCreate = newTags.slice(0, maxTags - tagIdsToAdd.length);
+  const mappedTagIds: string[] = [];
+  const seenNewTagNames = new Set<string>();
+  const uniqueNewTags: AutoTaggingActions['tagsToCreate'] = [];
+
+  for (const newTag of newTags) {
+    const normalizedName = normalizeTagName(newTag.name);
+
+    if (normalizedName === '' || seenNewTagNames.has(normalizedName)) {
+      continue;
+    }
+    seenNewTagNames.add(normalizedName);
+
+    const matchingExistingTagId = existingTagIdsByNormalizedName.get(normalizedName);
+
+    if (matchingExistingTagId) {
+      mappedTagIds.push(matchingExistingTagId);
+    } else {
+      uniqueNewTags.push(newTag);
+    }
+  }
+
+  const tagIdsToAdd = uniq([...requestedTagIds, ...mappedTagIds]).slice(0, maxTags);
+  const tagsToCreate = uniqueNewTags.slice(0, maxTags - tagIdsToAdd.length);
 
   return { tagIdsToAdd, tagsToCreate };
 }
