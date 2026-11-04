@@ -135,7 +135,7 @@ Paths are under `apps/papra-server/src/modules/`.
 | Apply | `auto-tagging/auto-tagging.usecases.ts`, `tags/tags.usecases.ts`, `tags/tags.repository.ts` † | `buildApplyAutoTaggingActions`, `createTag`, `applyTagsToDocuments`, batch add/remove methods |
 | Tag-change handlers | `documents/events/webhooks.document-tags-changed.ts` †, `documents/events/activity-log.document-tags-changed.ts` † | Trigger webhooks, write activity-log entries |
 
-### Known gaps and practice tasks
+### Known gaps and potential next steps
 
 1. **Blank documents still reach the model.** Extraction saves empty text, and enrichment is scheduled regardless. Guard in `buildEnrichDocument` (testable with a fake prompt function); the alternative is checking the returned document in the extraction task.
 2. **Near-duplicate tags.** New tag names aren't matched to existing ones, so "fakeInvoice" was created next to "Invoice". Fix in `getTagsActions` (a pure function): compare names ignoring case and spacing, map matches to existing IDs, and drop duplicates and empty names.
