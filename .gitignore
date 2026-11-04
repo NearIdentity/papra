@@ -47,5 +47,5 @@ ingestion
 .eslintcache
 .claude
 .opencode
-AGENTS.md
+#AGENTS.md
 .agents
