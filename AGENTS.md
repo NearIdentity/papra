@@ -12,7 +12,7 @@ Verified against upstream commit 93a569f (fork `aa-live-coding` adds docs and ag
 3. Client: `cd apps/papra-client && pnpm dev`, then open http://localhost:3000.
 - Port 3000 must be free. If the client lands on 3001, login fails with "Invalid callbackURL".
 - After switching commits or branches: `pnpm dev:reset` in `apps/papra-server` (wipes local data).
-- Local AI (put in `apps/papra-server/.env`, then restart the server): `AI_IS_ENABLED=true`, `AUTO_TAGGING_ENABLED=true`, `AI_DEFAULT_MODEL=<adapterId>://<model>` (for example `ollama://llama3.1:8b`; `AUTO_TAGGING_MODEL` also works). Ollama needs no other variables (defaults: `OLLAMA_BASE_URL=http://localhost:11434/v1`, key `ollama`; other OpenAI-compatible adapters use `<PREFIX>_BASE_URL` and `<PREFIX>_API_KEY`). Auto-tagging also needs the organization setting `ai.autoTagging.isEnabled` switched on in the client. The job is registered only if both server flags are true.
+- Local AI (put in `apps/papra-server/.env`, then restart the server): `AI_IS_ENABLED=true`, `AUTO_TAGGING_ENABLED=true`, `AI_DEFAULT_MODEL=ollama://llama3.1:8b` (confirmed working; other adapters use `<PREFIX>_BASE_URL` and `<PREFIX>_API_KEY`). Also enable Auto-tagging in the organization's settings page. Re-run the pipeline on a document with `POST /api/organizations/:organizationId/documents/:documentId/reprocess`.
 - Test data: the "Devtools" button in the client (`apps/papra-client/src/modules/devtools`) generates fake documents.
 
 ## Verify before declaring done
