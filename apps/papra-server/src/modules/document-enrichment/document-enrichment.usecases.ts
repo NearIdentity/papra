@@ -10,6 +10,8 @@ import type { ResolveOrganizationSettingsUsecase } from '../organizations/organi
 import { createLogger } from '../shared/logger/logger';
 import type { TagsRepository } from '../tags/tags.repository';
 
+export const BLANK_DOCUMENT_TAG_NAME = 'blankDocument';
+
 export function buildEnrichDocument({
   promptForAutoTagging,
   applyAutoTaggingActions,
@@ -57,6 +59,27 @@ export function buildEnrichDocument({
 
     if (!document) {
       throw createDocumentNotFoundError();
+    }
+
+    const isBlankDocument = document.content.trim() === '';
+
+    if (isBlankDocument) {
+      logger.info(
+        { documentId, organizationId },
+        'Document is blank. Skipping LLM auto-tagging and applying default tag.',
+      );
+
+      const existingBlankTag = existingTags.find(
+        ({ name }) => name.toLowerCase() === BLANK_DOCUMENT_TAG_NAME.toLowerCase(),
+      );
+
+      await applyAutoTaggingActions({
+        documentId,
+        organizationId,
+        tagIdsToAdd: existingBlankTag ? [existingBlankTag.id] : [],
+        tagsToCreate: existingBlankTag ? [] : [{ name: BLANK_DOCUMENT_TAG_NAME }],
+      });
+      return;
     }
 
     const startedAt = Date.now();

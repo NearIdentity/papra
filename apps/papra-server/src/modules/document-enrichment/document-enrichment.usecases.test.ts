@@ -226,6 +226,60 @@ describe('document enrichment', () => {
     });
   });
 
+  test('when the document is blank, the AI is not called and the default blankDocument tag is created and applied', async () => {
+    const deps = await createTestDeps({
+      organizations: seed.organizations,
+      documents: [{ ...baseDocument, content: '  \n ' }],
+      tags: seed.tags,
+    });
+    const promptForAutoTagging = vi.fn<ReturnType<typeof buildPromptForAutoTagging>>();
+    const enrichDocument = buildEnrichDocument({
+      ...deps,
+      promptForAutoTagging,
+      resolveOrganizationSettings: createTestResolveOrganizationSettings(),
+    });
+
+    await enrichDocument(documentIds);
+
+    expect(promptForAutoTagging).not.toHaveBeenCalled();
+    const blankTag = (await deps.db.select().from(tagsTable)).find(
+      (tag) => tag.name === 'blankDocument',
+    );
+    expect(blankTag).toBeDefined();
+    expect(await deps.db.select().from(documentsTagsTable)).toEqual([
+      { documentId: 'doc_1', tagId: blankTag!.id },
+    ]);
+  });
+
+  test('when the document is blank and the blankDocument tag already exists, it is reused', async () => {
+    const existingTag = {
+      id: 'tag_blank',
+      name: 'blankDocument',
+      normalizedName: 'blankdocument',
+      color: '#000000',
+      organizationId: 'org_1',
+    };
+    const deps = await createTestDeps({
+      organizations: seed.organizations,
+      documents: [{ ...baseDocument, content: '' }],
+      tags: [existingTag],
+    });
+    const promptForAutoTagging = vi.fn<ReturnType<typeof buildPromptForAutoTagging>>();
+    const enrichDocument = buildEnrichDocument({
+      ...deps,
+      promptForAutoTagging,
+      resolveOrganizationSettings: createTestResolveOrganizationSettings(),
+    });
+
+    await enrichDocument(documentIds);
+
+    expect(promptForAutoTagging).not.toHaveBeenCalled();
+    expect(await deps.db.select().from(tagsTable)).toHaveLength(1);
+    expect(await deps.db.select().from(documentsTagsTable)).toEqual([
+      { documentId: 'doc_1', tagId: 'tag_blank' },
+    ]);
+  });
+
   test('a missing document fails before analysis', async () => {
     const deps = await createTestDeps({ organizations: seed.organizations, tags: seed.tags });
     const promptForAutoTagging = vi.fn<ReturnType<typeof buildPromptForAutoTagging>>();
