@@ -14,6 +14,8 @@ Verified against upstream commit 93a569f (fork `aa-live-coding` adds docs and ag
 - After switching commits or branches: `pnpm dev:reset` in `apps/papra-server` (wipes local data).
 - Local AI (put in `apps/papra-server/.env`, then restart the server): `AI_IS_ENABLED=true`, `AUTO_TAGGING_ENABLED=true`, `AI_DEFAULT_MODEL=ollama://llama3.1:8b` (confirmed working; other adapters use `<PREFIX>_BASE_URL` and `<PREFIX>_API_KEY`). Also enable Auto-tagging in the organization's settings page. Re-run the pipeline on a document with `POST /api/organizations/:organizationId/documents/:documentId/reprocess`.
 - Test data: the "Devtools" button in the client (`apps/papra-client/src/modules/devtools`) generates fake documents.
+- Searching: exclude `node_modules` (`grep -rn ... --exclude-dir=node_modules`); it contains a copy of the server package (`@papra/app-server`) that duplicates every result. Edit only files under `apps/papra-server/src`.
+- Documents settings (env): `DOCUMENTS_CONTENT_EXTRACTION_ENABLED` (no extraction means no tagging rules or enrichment), `DOCUMENTS_OCR_LANGUAGES`, `DOCUMENT_REPROCESSING_ENABLED`, `DOCUMENT_REPROCESSING_RATE_LIMIT`.
 
 ## Verify before declaring done
 - Server (in `apps/papra-server`): `pnpm test:unit` and `pnpm typecheck`.
@@ -32,6 +34,7 @@ Verified against upstream commit 93a569f (fork `aa-live-coding` adds docs and ag
 - Style: functional; single quotes, semicolons, 2 spaces, trailing commas; `import type` for types; business-named tests (no `it('should return true')`).
 - UI strings: `apps/papra-client/src/locales/en.dictionary.ts` (English is the fallback).
 - Solid is not React: signals and resources; components run once; no hook patterns.
+- Route style varies by module: tags uses typed contracts (`defineApiRoute`); documents routes still use the older `app.post(path, requireAuthentication(...), validateParams(...), handler)` style. New endpoints use contracts (migration in progress); when editing an existing route, match its surrounding style.
 
 ## Domain notes
 - Tag changes. Batch path: `applyTagsToDocuments` emits `document.tags.changed`; handlers registered in `modules/app/events/events.handlers.ts` write the activity log and trigger webhooks. Single-document add/remove routes call `deferTriggerWebhooks` and `deferRegisterDocumentActivityLog` directly. Do not emit the event and keep the inline calls, or every webhook and log entry fires twice.
