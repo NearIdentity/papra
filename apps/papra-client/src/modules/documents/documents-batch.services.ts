@@ -33,3 +33,31 @@ export async function batchUpdateDocumentTags({
     body: { filter, addTagIds, removeTagIds },
   });
 }
+
+export async function batchPinDocuments({
+  organizationId,
+  filter,
+}: {
+  organizationId: string;
+  filter: BatchTargetFilter;
+}) {
+  await apiClient({
+    method: 'POST',
+    path: `/api/organizations/${organizationId}/documents/batch/pin`,
+    body: { filter },
+  });
+}
+
+export async function batchUnpinDocuments({
+  organizationId,
+  filter,
+}: {
+  organizationId: string;
+  filter: BatchTargetFilter;
+}) {
+  await apiClient({
+    method: 'POST',
+    path: `/api/organizations/${organizationId}/documents/batch/unpin`,
+    body: { filter },
+  });
+}

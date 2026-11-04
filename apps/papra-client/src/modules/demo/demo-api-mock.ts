@@ -349,6 +349,11 @@ const inMemoryApiMock: Record<string, { handler: any }> = {
       const sortDirection = sortOrder === 'asc' ? 1 : -1;
       const paginatedDocuments = filteredDocuments
         .toSorted((a, b) => {
+          // pinned documents always come first, whatever the sort is
+          if (Boolean(a.pinnedAt) !== Boolean(b.pinnedAt)) {
+            return a.pinnedAt ? -1 : 1;
+          }
+
           const av = getSortValue(a);
           const bv = getSortValue(b);
           if (av < bv) {
@@ -802,6 +807,67 @@ const inMemoryApiMock: Record<string, { handler: any }> = {
       );
 
       return { trashedDocumentIds, trashedCount: trashedDocumentIds.length };
+    },
+  }),
+
+  ...defineHandler({
+    path: '/api/organizations/:organizationId/documents/batch/pin',
+    method: 'POST',
+    handler: async ({ params: { organizationId }, body }) => {
+      const organization = await organizationStorage.getItem(organizationId);
+      assert(organization, { status: 403 });
+
+      const filter = get(body, ['filter']) as { documentIds: string[] } | { query: string };
+      assert(filter, { status: 400 });
+
+      const documentIds = await resolveBatchTargetDocumentIds({ filter, organizationId });
+
+      await Promise.all(
+        documentIds.map(async (documentId) => {
+          const key = `${organizationId}:${documentId}`;
+          const document = await documentStorage.getItem(key);
+
+          if (!document || document.deletedAt) {
+            return;
+          }
+
+          await documentStorage.setItem(key, {
+            ...document,
+            pinnedAt: document.pinnedAt ?? new Date(),
+          });
+        }),
+      );
+
+      return {};
+    },
+  }),
+
+  ...defineHandler({
+    path: '/api/organizations/:organizationId/documents/batch/unpin',
+    method: 'POST',
+    handler: async ({ params: { organizationId }, body }) => {
+      const organization = await organizationStorage.getItem(organizationId);
+      assert(organization, { status: 403 });
+
+      const filter = get(body, ['filter']) as { documentIds: string[] } | { query: string };
+      assert(filter, { status: 400 });
+
+      const documentIds = await resolveBatchTargetDocumentIds({ filter, organizationId });
+
+      await Promise.all(
+        documentIds.map(async (documentId) => {
+          const key = `${organizationId}:${documentId}`;
+          const document = await documentStorage.getItem(key);
+
+          if (!document || document.deletedAt) {
+            return;
+          }
+
+          await documentStorage.setItem(key, { ...document, pinnedAt: undefined });
+        }),
+      );
+
+      return {};
     },
   }),
 

@@ -13,7 +13,9 @@ import { createDocumentIdsNotFromOrganizationError } from './documents-batch.err
 import {
   resolveBatchTargetDocumentIds,
   tagDocumentsBatch,
+  pinDocumentsBatch,
   trashDocumentsBatch,
+  unpinDocumentsBatch,
 } from './documents-batch.usecases';
 
 function createStubSearchServices({ documentIds = [] }: { documentIds?: string[] } = {}) {
@@ -812,6 +814,92 @@ describe('documents-batch usecases', () => {
       expect(taggedCount).to.eql(0);
       expect(untaggedCount).to.eql(0);
       expect(eventServices.getEmittedEvents()).to.eql([]);
+    });
+  });
+
+  describe('pinDocumentsBatch and unpinDocumentsBatch', () => {
+    const seed = async () =>
+      createInMemoryDatabase({
+        organizations: [
+          { id: 'organization-1', name: 'Organization 1' },
+          { id: 'organization-2', name: 'Organization 2' },
+        ],
+        documents: [
+          { id: 'doc-1', ...baseDocument, name: 'doc 1', originalSha256Hash: 'h1' },
+          { id: 'doc-2', ...baseDocument, name: 'doc 2', originalSha256Hash: 'h2' },
+          {
+            id: 'doc-3',
+            ...baseDocument,
+            organizationId: 'organization-2',
+            name: 'doc 3',
+            originalSha256Hash: 'h3',
+          },
+        ],
+      });
+
+    test('pins the documents targeted by ids, then unpins them', async () => {
+      const { db } = await seed();
+      const documentsRepository = createDocumentsRepository({ db });
+      const { services } = createStubSearchServices();
+
+      const { pinnedCount } = await pinDocumentsBatch({
+        filter: { documentIds: ['doc-1', 'doc-2'] },
+        organizationId: 'organization-1',
+        documentsRepository,
+        documentSearchServices: services,
+      });
+      expect(pinnedCount).to.eql(2);
+
+      const pinned = await db.select().from(documentsTable);
+      expect(
+        pinned
+          .filter((d) => d.pinnedAt)
+          .map((d) => d.id)
+          .toSorted(),
+      ).to.eql(['doc-1', 'doc-2']);
+
+      const { unpinnedCount } = await unpinDocumentsBatch({
+        filter: { documentIds: ['doc-1'] },
+        organizationId: 'organization-1',
+        documentsRepository,
+        documentSearchServices: services,
+      });
+      expect(unpinnedCount).to.eql(1);
+
+      const after = await db.select().from(documentsTable);
+      expect(after.filter((d) => d.pinnedAt).map((d) => d.id)).to.eql(['doc-2']);
+    });
+
+    test('pins every document matching a search query', async () => {
+      const { db } = await seed();
+      const { services, calls } = createStubSearchServices({ documentIds: ['doc-2'] });
+
+      const { pinnedDocumentIds } = await pinDocumentsBatch({
+        filter: { query: 'doc 2' },
+        organizationId: 'organization-1',
+        documentsRepository: createDocumentsRepository({ db }),
+        documentSearchServices: services,
+      });
+
+      expect(pinnedDocumentIds).to.eql(['doc-2']);
+      expect(calls).to.have.length(1);
+    });
+
+    test('throws and pins nothing when an id belongs to another organization', async () => {
+      const { db } = await seed();
+      const { services } = createStubSearchServices();
+
+      await expect(
+        pinDocumentsBatch({
+          filter: { documentIds: ['doc-1', 'doc-3'] },
+          organizationId: 'organization-1',
+          documentsRepository: createDocumentsRepository({ db }),
+          documentSearchServices: services,
+        }),
+      ).rejects.toThrow(createDocumentIdsNotFromOrganizationError());
+
+      const records = await db.select().from(documentsTable);
+      expect(records.every((d) => d.pinnedAt === null)).to.eql(true);
     });
   });
 });

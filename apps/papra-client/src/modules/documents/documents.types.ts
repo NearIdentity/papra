@@ -12,6 +12,7 @@ export type Document = {
   createdAt: Date;
   updatedAt?: Date;
   documentDate?: Date;
+  pinnedAt?: Date;
   isDeleted?: boolean;
   deletedAt?: Date;
   deletedBy?: string;

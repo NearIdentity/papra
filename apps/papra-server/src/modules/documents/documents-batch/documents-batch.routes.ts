@@ -9,12 +9,23 @@ import { ensureUserIsInOrganization } from '../../organizations/organizations.us
 import { validateJsonBody, validateParams } from '../../shared/validation/validation';
 import { createTagsRepository } from '../../tags/tags.repository';
 import { createDocumentsRepository } from '../documents.repository';
-import { batchTagsBodySchema, batchTrashBodySchema } from './documents-batch.schemas';
-import { tagDocumentsBatch, trashDocumentsBatch } from './documents-batch.usecases';
+import {
+  batchPinBodySchema,
+  batchTagsBodySchema,
+  batchTrashBodySchema,
+} from './documents-batch.schemas';
+import {
+  pinDocumentsBatch,
+  tagDocumentsBatch,
+  trashDocumentsBatch,
+  unpinDocumentsBatch,
+} from './documents-batch.usecases';
 
 export function registerDocumentsBatchRoutes(context: RouteDefinitionContext) {
   setupBatchTrashDocumentsRoute(context);
   setupBatchTagDocumentsRoute(context);
+  setupBatchPinDocumentsRoute(context);
+  setupBatchUnpinDocumentsRoute(context);
 }
 
 function setupBatchTrashDocumentsRoute({
@@ -94,6 +105,74 @@ function setupBatchTagDocumentsRoute({
         tagsRepository,
         documentSearchServices,
         eventServices,
+      });
+
+      return context.body(null, 204);
+    },
+  );
+}
+
+function setupBatchPinDocumentsRoute({ app, db, documentSearchServices }: RouteDefinitionContext) {
+  app.post(
+    '/api/organizations/:organizationId/documents/batch/pin',
+    requireAuthentication({ apiKeyPermissions: [API_KEY_PERMISSIONS.DOCUMENTS.UPDATE] }),
+    validateParams(
+      v.strictObject({
+        organizationId: organizationIdSchema,
+      }),
+    ),
+    validateJsonBody(batchPinBodySchema),
+    async (context) => {
+      const { userId } = getUser({ context });
+      const { organizationId } = context.req.valid('param');
+      const { filter } = context.req.valid('json');
+
+      const documentsRepository = createDocumentsRepository({ db });
+      const organizationsRepository = createOrganizationsRepository({ db });
+
+      await ensureUserIsInOrganization({ userId, organizationId, organizationsRepository });
+
+      await pinDocumentsBatch({
+        filter,
+        organizationId,
+        documentsRepository,
+        documentSearchServices,
+      });
+
+      return context.body(null, 204);
+    },
+  );
+}
+
+function setupBatchUnpinDocumentsRoute({
+  app,
+  db,
+  documentSearchServices,
+}: RouteDefinitionContext) {
+  app.post(
+    '/api/organizations/:organizationId/documents/batch/unpin',
+    requireAuthentication({ apiKeyPermissions: [API_KEY_PERMISSIONS.DOCUMENTS.UPDATE] }),
+    validateParams(
+      v.strictObject({
+        organizationId: organizationIdSchema,
+      }),
+    ),
+    validateJsonBody(batchPinBodySchema),
+    async (context) => {
+      const { userId } = getUser({ context });
+      const { organizationId } = context.req.valid('param');
+      const { filter } = context.req.valid('json');
+
+      const documentsRepository = createDocumentsRepository({ db });
+      const organizationsRepository = createOrganizationsRepository({ db });
+
+      await ensureUserIsInOrganization({ userId, organizationId, organizationsRepository });
+
+      await unpinDocumentsBatch({
+        filter,
+        organizationId,
+        documentsRepository,
+        documentSearchServices,
       });
 
       return context.body(null, 204);

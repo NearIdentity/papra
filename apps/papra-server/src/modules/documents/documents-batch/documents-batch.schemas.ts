@@ -20,6 +20,10 @@ export const batchTrashBodySchema = v.strictObject({
   filter: batchTargetFilterSchema,
 });
 
+export const batchPinBodySchema = v.strictObject({
+  filter: batchTargetFilterSchema,
+});
+
 const tagIdsListSchema = v.optional(
   v.pipe(v.array(tagIdSchema), v.maxLength(BATCH_MAX_TAGS_PER_REQUEST)),
   [],

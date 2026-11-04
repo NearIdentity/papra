@@ -26,7 +26,12 @@ import {
   standardActionsColumn,
   tagsColumn,
 } from '../components/documents-list.component';
-import { batchTrashDocuments, batchUpdateDocumentTags } from '../documents-batch.services';
+import {
+  batchPinDocuments,
+  batchTrashDocuments,
+  batchUnpinDocuments,
+  batchUpdateDocumentTags,
+} from '../documents-batch.services';
 import {
   DEFAULT_DOCUMENT_SEARCH_SORT_FIELD,
   DEFAULT_DOCUMENT_SEARCH_SORT_ORDER,
@@ -240,6 +245,38 @@ export const DocumentsPage: Component = () => {
     },
   }));
 
+  const pinMutation = useMutation(() => ({
+    mutationFn: async ({ shouldPin }: { shouldPin: boolean }) => {
+      const filter = getBatchFilter();
+      if (!filter) {
+        return;
+      }
+      const batchPin = shouldPin ? batchPinDocuments : batchUnpinDocuments;
+      await batchPin({ organizationId: params.organizationId, filter });
+    },
+    onSuccess: (_, { shouldPin }) => {
+      const count = getEffectiveCount();
+      invalidateDocuments();
+      clearSelection();
+      createToast({
+        message: t(
+          shouldPin ? 'documents.list.batch.pin.success' : 'documents.list.batch.unpin.success',
+          { count },
+        ),
+        type: 'success',
+      });
+    },
+    onError: () => {
+      createToast({
+        message: t('documents.list.batch.error'),
+        type: 'error',
+      });
+    },
+  }));
+
+  const isBatchActionPending = () =>
+    tagMutation.isPending || trashMutation.isPending || pinMutation.isPending;
+
   const showToolbar = () => getSelectedIds().length > 0 || getSelectAllMatchingQuery();
 
   async function handleBatchTrash() {
@@ -392,8 +429,28 @@ export const DocumentsPage: Component = () => {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => pinMutation.mutate({ shouldPin: true })}
+                      disabled={isBatchActionPending()}
+                    >
+                      <div class="i-tabler-pin size-4 mr-2" />
+                      {t('documents.list.batch.pin-action')}
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => pinMutation.mutate({ shouldPin: false })}
+                      disabled={isBatchActionPending()}
+                    >
+                      <div class="i-tabler-pin-off size-4 mr-2" />
+                      {t('documents.list.batch.unpin-action')}
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => setTagDialogOpen(true)}
-                      disabled={tagMutation.isPending || trashMutation.isPending}
+                      disabled={isBatchActionPending()}
                     >
                       <div class="i-tabler-tag size-4 mr-2" />
                       {t('documents.list.batch.tag-action')}
@@ -404,7 +461,7 @@ export const DocumentsPage: Component = () => {
                       size="sm"
                       onClick={handleBatchTrash}
                       isLoading={trashMutation.isPending}
-                      disabled={tagMutation.isPending}
+                      disabled={tagMutation.isPending || pinMutation.isPending}
                       class="text-red-500 hover:text-red-600"
                     >
                       <div class="i-tabler-trash size-4 mr-2" />
@@ -416,7 +473,7 @@ export const DocumentsPage: Component = () => {
                       size="icon"
                       class="size-8"
                       onClick={clearSelection}
-                      disabled={tagMutation.isPending || trashMutation.isPending}
+                      disabled={isBatchActionPending()}
                       aria-label={t('documents.list.batch.clear')}
                     >
                       <div class="i-tabler-x size-4" />

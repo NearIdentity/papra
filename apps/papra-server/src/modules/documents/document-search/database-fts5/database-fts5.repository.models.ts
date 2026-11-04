@@ -52,11 +52,15 @@ const sortableColumnsByField: Record<DocumentSearchSortField, SQLiteColumn | SQL
   documentDate: documentsTable.documentDate,
 };
 
+// 1 for pinned documents, 0 otherwise: pinned documents always come first, whatever the requested sort is
+export const isPinnedSql = sql<number>`(${documentsTable.pinnedAt} IS NOT NULL)`;
+
 export function makeSearchOrderByClauses({ sort }: { sort: DocumentSearchSort }) {
   const sortColumn = sortableColumnsByField[sort.field];
   const orderDirection = sort.order === 'desc' ? desc : asc;
 
   const orderByClauses = [
+    desc(isPinnedSql),
     orderDirection(sortColumn),
     ...(sort.field !== 'createdAt' ? [orderDirection(documentsTable.createdAt)] : []),
     orderDirection(documentsTable.id), // tie-breaker to ensure deterministic order

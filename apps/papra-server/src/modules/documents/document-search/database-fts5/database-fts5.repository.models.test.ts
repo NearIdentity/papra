@@ -56,24 +56,28 @@ describe('database-fts5 repository models', () => {
     test('sort by createdAt', () => {
       expect(
         toOrderByClause(makeSearchOrderByClauses({ sort: { field: 'createdAt', order: 'asc' } })),
-      ).to.eql('"documents"."created_at" asc, "documents"."id" asc');
+      ).to.eql(
+        '("documents"."pinned_at" IS NOT NULL) desc, "documents"."created_at" asc, "documents"."id" asc',
+      );
 
       expect(
         toOrderByClause(makeSearchOrderByClauses({ sort: { field: 'createdAt', order: 'desc' } })),
-      ).to.eql('"documents"."created_at" desc, "documents"."id" desc');
+      ).to.eql(
+        '("documents"."pinned_at" IS NOT NULL) desc, "documents"."created_at" desc, "documents"."id" desc',
+      );
     });
 
     test('sort by name, the name is sorted case-insensitively, with createdAt as fallback', () => {
       expect(
         toOrderByClause(makeSearchOrderByClauses({ sort: { field: 'name', order: 'desc' } })),
       ).to.eql(
-        '"documents"."name" COLLATE NOCASE desc, "documents"."created_at" desc, "documents"."id" desc',
+        '("documents"."pinned_at" IS NOT NULL) desc, "documents"."name" COLLATE NOCASE desc, "documents"."created_at" desc, "documents"."id" desc',
       );
 
       expect(
         toOrderByClause(makeSearchOrderByClauses({ sort: { field: 'name', order: 'asc' } })),
       ).to.eql(
-        '"documents"."name" COLLATE NOCASE asc, "documents"."created_at" asc, "documents"."id" asc',
+        '("documents"."pinned_at" IS NOT NULL) desc, "documents"."name" COLLATE NOCASE asc, "documents"."created_at" asc, "documents"."id" asc',
       );
     });
 
@@ -83,7 +87,7 @@ describe('database-fts5 repository models', () => {
           makeSearchOrderByClauses({ sort: { field: 'documentDate', order: 'asc' } }),
         ),
       ).to.eql(
-        '"documents"."document_date" asc, "documents"."created_at" asc, "documents"."id" asc',
+        '("documents"."pinned_at" IS NOT NULL) desc, "documents"."document_date" asc, "documents"."created_at" asc, "documents"."id" asc',
       );
 
       expect(
@@ -91,7 +95,7 @@ describe('database-fts5 repository models', () => {
           makeSearchOrderByClauses({ sort: { field: 'documentDate', order: 'desc' } }),
         ),
       ).to.eql(
-        '"documents"."document_date" desc, "documents"."created_at" desc, "documents"."id" desc',
+        '("documents"."pinned_at" IS NOT NULL) desc, "documents"."document_date" desc, "documents"."created_at" desc, "documents"."id" desc',
       );
     });
 
@@ -99,12 +103,26 @@ describe('database-fts5 repository models', () => {
       expect(
         toOrderByClause(makeSearchOrderByClauses({ sort: { field: 'updatedAt', order: 'desc' } })),
       ).to.eql(
-        '"documents"."updated_at" desc, "documents"."created_at" desc, "documents"."id" desc',
+        '("documents"."pinned_at" IS NOT NULL) desc, "documents"."updated_at" desc, "documents"."created_at" desc, "documents"."id" desc',
       );
 
       expect(
         toOrderByClause(makeSearchOrderByClauses({ sort: { field: 'updatedAt', order: 'asc' } })),
-      ).to.eql('"documents"."updated_at" asc, "documents"."created_at" asc, "documents"."id" asc');
+      ).to.eql(
+        '("documents"."pinned_at" IS NOT NULL) desc, "documents"."updated_at" asc, "documents"."created_at" asc, "documents"."id" asc',
+      );
+    });
+
+    test('pinned documents always come first, whatever the sort field and order are', () => {
+      for (const field of ['createdAt', 'updatedAt', 'name', 'documentDate'] as const) {
+        for (const order of ['asc', 'desc'] as const) {
+          expect(
+            toOrderByClause(makeSearchOrderByClauses({ sort: { field, order } })).startsWith(
+              '("documents"."pinned_at" IS NOT NULL) desc, ',
+            ),
+          ).to.eql(true);
+        }
+      }
     });
   });
 });

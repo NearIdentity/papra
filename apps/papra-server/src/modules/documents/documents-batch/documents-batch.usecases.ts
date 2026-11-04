@@ -202,3 +202,75 @@ export async function tagDocumentsBatch({
     removedPairs,
   };
 }
+
+export async function pinDocumentsBatch({
+  filter,
+  organizationId,
+  documentsRepository,
+  documentSearchServices,
+  logger = createLogger({ namespace: 'documents-batch.usecases' }),
+}: {
+  filter: BatchTargetFilter;
+  organizationId: string;
+  documentsRepository: DocumentsRepository;
+  documentSearchServices: DocumentSearchServices;
+  logger?: Logger;
+}) {
+  const { documentIds } = await resolveBatchTargetDocumentIds({
+    filter,
+    organizationId,
+    documentSearchServices,
+    documentsRepository,
+    logger,
+  });
+
+  const { pinnedDocumentIds } = await documentsRepository.pinDocuments({
+    documentIds,
+    organizationId,
+  });
+
+  logger.info(
+    { organizationId, resolvedCount: documentIds.length, pinnedCount: pinnedDocumentIds.length },
+    'Executed batch document pin',
+  );
+
+  return { pinnedDocumentIds, pinnedCount: pinnedDocumentIds.length };
+}
+
+export async function unpinDocumentsBatch({
+  filter,
+  organizationId,
+  documentsRepository,
+  documentSearchServices,
+  logger = createLogger({ namespace: 'documents-batch.usecases' }),
+}: {
+  filter: BatchTargetFilter;
+  organizationId: string;
+  documentsRepository: DocumentsRepository;
+  documentSearchServices: DocumentSearchServices;
+  logger?: Logger;
+}) {
+  const { documentIds } = await resolveBatchTargetDocumentIds({
+    filter,
+    organizationId,
+    documentSearchServices,
+    documentsRepository,
+    logger,
+  });
+
+  const { unpinnedDocumentIds } = await documentsRepository.unpinDocuments({
+    documentIds,
+    organizationId,
+  });
+
+  logger.info(
+    {
+      organizationId,
+      resolvedCount: documentIds.length,
+      unpinnedCount: unpinnedDocumentIds.length,
+    },
+    'Executed batch document unpin',
+  );
+
+  return { unpinnedDocumentIds, unpinnedCount: unpinnedDocumentIds.length };
+}

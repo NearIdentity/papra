@@ -78,5 +78,12 @@ describe('http-client models', () => {
         baz: 'qux',
       });
     });
+
+    test('transforms pinnedAt (set or null) so pinned documents can be told apart', () => {
+      expect(coerceDates({ pinnedAt: '2021-01-01T00:00:00.000Z' })).to.eql({
+        pinnedAt: new Date('2021-01-01T00:00:00.000Z'),
+      });
+      expect(coerceDates({ pinnedAt: null })).to.eql({ pinnedAt: undefined });
+    });
   });
 });

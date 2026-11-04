@@ -352,4 +352,113 @@ describe('documents repository', () => {
       ).to.eql(true);
     });
   });
+
+  describe('pinDocuments and unpinDocuments', () => {
+    const makeDocument = (id: string, organizationId: string, extra: object = {}) => ({
+      id,
+      organizationId,
+      mimeType: 'text/plain',
+      originalStorageKey: `${organizationId}/originals/${id}.txt`,
+      name: `${id}.txt`,
+      originalName: `${id}.txt`,
+      originalSha256Hash: `hash-${id}`,
+      ...extra,
+    });
+
+    test('pinning only affects non-deleted documents of the given organization, and returns the ids that changed', async () => {
+      const { db } = await createInMemoryDatabase({
+        organizations: [
+          { id: 'org-1', name: 'Organization 1' },
+          { id: 'org-2', name: 'Organization 2' },
+        ],
+        documents: [
+          makeDocument('doc-1', 'org-1'),
+          makeDocument('doc-2', 'org-1', { isDeleted: true }),
+          makeDocument('doc-3', 'org-2'),
+        ],
+      });
+      const documentsRepository = createDocumentsRepository({ db });
+      const now = new Date('2025-01-02T03:04:05.000Z');
+
+      const { pinnedDocumentIds } = await documentsRepository.pinDocuments({
+        documentIds: ['doc-1', 'doc-2', 'doc-3'],
+        organizationId: 'org-1',
+        now,
+      });
+
+      expect(pinnedDocumentIds).to.eql(['doc-1']);
+
+      const records = await db.select().from(documentsTable);
+      expect(Object.fromEntries(records.map((r) => [r.id, r.pinnedAt ?? null]))).to.eql({
+        'doc-1': now,
+        'doc-2': null,
+        'doc-3': null,
+      });
+    });
+
+    test('re-pinning an already pinned document keeps its original pin date and is not reported as changed', async () => {
+      const { db } = await createInMemoryDatabase({
+        organizations: [{ id: 'org-1', name: 'Organization 1' }],
+        documents: [makeDocument('doc-1', 'org-1')],
+      });
+      const documentsRepository = createDocumentsRepository({ db });
+      const firstPin = new Date('2025-01-01T00:00:00.000Z');
+
+      await documentsRepository.pinDocuments({
+        documentIds: ['doc-1'],
+        organizationId: 'org-1',
+        now: firstPin,
+      });
+      const { pinnedDocumentIds } = await documentsRepository.pinDocuments({
+        documentIds: ['doc-1'],
+        organizationId: 'org-1',
+        now: new Date('2025-06-01T00:00:00.000Z'),
+      });
+
+      expect(pinnedDocumentIds).to.eql([]);
+      const [record] = await db.select().from(documentsTable);
+      expect(record?.pinnedAt).to.eql(firstPin);
+    });
+
+    test('unpinning clears the pin only for pinned documents of the organization', async () => {
+      const pinnedAt = new Date('2025-01-01T00:00:00.000Z');
+      const { db } = await createInMemoryDatabase({
+        organizations: [
+          { id: 'org-1', name: 'Organization 1' },
+          { id: 'org-2', name: 'Organization 2' },
+        ],
+        documents: [
+          makeDocument('doc-1', 'org-1', { pinnedAt }),
+          makeDocument('doc-2', 'org-1'),
+          makeDocument('doc-3', 'org-2', { pinnedAt }),
+        ],
+      });
+      const documentsRepository = createDocumentsRepository({ db });
+
+      const { unpinnedDocumentIds } = await documentsRepository.unpinDocuments({
+        documentIds: ['doc-1', 'doc-2', 'doc-3'],
+        organizationId: 'org-1',
+      });
+
+      expect(unpinnedDocumentIds).to.eql(['doc-1']);
+      const records = await db.select().from(documentsTable);
+      expect(Object.fromEntries(records.map((r) => [r.id, r.pinnedAt ?? null]))).to.eql({
+        'doc-1': null,
+        'doc-2': null,
+        'doc-3': pinnedAt,
+      });
+    });
+
+    test('an empty id list is a no-op', async () => {
+      const { db } = await createInMemoryDatabase();
+      const documentsRepository = createDocumentsRepository({ db });
+
+      expect(
+        await documentsRepository.pinDocuments({ documentIds: [], organizationId: 'org-1' }),
+      ).to.eql({ pinnedDocumentIds: [] });
+      expect(
+        await documentsRepository.unpinDocuments({ documentIds: [], organizationId: 'org-1' }),
+      ).to.eql({ unpinnedDocumentIds: [] });
+    });
+  });
 });

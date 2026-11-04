@@ -1,7 +1,11 @@
 import * as v from 'valibot';
 import { describe, expect, test } from 'vitest';
 import { BATCH_MAX_DOCUMENTS, BATCH_MAX_TAGS_PER_REQUEST } from './documents-batch.constants';
-import { batchTagsBodySchema, batchTrashBodySchema } from './documents-batch.schemas';
+import {
+  batchPinBodySchema,
+  batchTagsBodySchema,
+  batchTrashBodySchema,
+} from './documents-batch.schemas';
 
 describe('documents-batch.schemas', () => {
   describe('batchTrashBodySchema', () => {
@@ -197,6 +201,23 @@ describe('documents-batch.schemas', () => {
           unexpected: true,
         }),
       ).toThrow();
+    });
+  });
+
+  describe('batchPinBodySchema', () => {
+    test('accepts a filter by document ids or by search query', () => {
+      expect(
+        v.parse(batchPinBodySchema, { filter: { documentIds: ['doc_aaaaaaaaaaaaaaaaaaaaaaaa'] } }),
+      ).to.eql({ filter: { documentIds: ['doc_aaaaaaaaaaaaaaaaaaaaaaaa'] } });
+      expect(v.parse(batchPinBodySchema, { filter: { query: 'invoice' } })).to.eql({
+        filter: { query: 'invoice' },
+      });
+    });
+
+    test('rejects a missing filter, an empty id list and unknown keys', () => {
+      expect(() => v.parse(batchPinBodySchema, {})).toThrow();
+      expect(() => v.parse(batchPinBodySchema, { filter: { documentIds: [] } })).toThrow();
+      expect(() => v.parse(batchPinBodySchema, { filter: { query: 'a' }, extra: true })).toThrow();
     });
   });
 });

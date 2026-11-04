@@ -5,6 +5,100 @@ import { createDocumentSearchRepository } from './database-fts5.repository';
 
 describe('database-fts5 repository', () => {
   describe('searchOrganizationDocuments', () => {
+    describe('pinned documents', () => {
+      const makeDoc = (n: number, extra: object = {}) => ({
+        id: `doc_${n}`,
+        organizationId: 'org_1',
+        name: `Doc ${n}`,
+        originalName: `doc-${n}.pdf`,
+        content: 'lorem',
+        originalStorageKey: '',
+        mimeType: 'application/pdf',
+        originalSha256Hash: `hash${n}`,
+        isDeleted: false,
+        createdAt: new Date(`2025-01-0${n}T00:00:00.000Z`),
+        ...extra,
+      });
+
+      const setup = async () => {
+        const documents = [
+          makeDoc(1, { pinnedAt: new Date('2025-02-01') }),
+          makeDoc(2),
+          makeDoc(3),
+          makeDoc(4, { pinnedAt: new Date('2025-02-02') }),
+          makeDoc(5),
+        ];
+        const { db } = await createInMemoryDatabase({
+          organizations: [{ id: 'org_1', name: 'Organization 1' }],
+          documents,
+        });
+        const repository = createDocumentSearchRepository({ db });
+        await repository.indexDocuments({ documents });
+        return repository;
+      };
+
+      const ids = (r: { documents: { id: string }[] }) => r.documents.map((d) => d.id);
+
+      test('pinned documents come first, then the rest in the requested sort order', async () => {
+        const repository = await setup();
+
+        expect(
+          ids(
+            await repository.searchOrganizationDocuments({
+              organizationId: 'org_1',
+              searchQuery: '',
+              pageIndex: 0,
+              pageSize: 10,
+              sort: { field: 'createdAt', order: 'desc' },
+            }),
+          ),
+        ).to.eql(['doc_4', 'doc_1', 'doc_5', 'doc_3', 'doc_2']);
+
+        expect(
+          ids(
+            await repository.searchOrganizationDocuments({
+              organizationId: 'org_1',
+              searchQuery: '',
+              pageIndex: 0,
+              pageSize: 10,
+              sort: { field: 'name', order: 'asc' },
+            }),
+          ),
+        ).to.eql(['doc_1', 'doc_4', 'doc_2', 'doc_3', 'doc_5']);
+      });
+
+      test('pinned documents stay first while searching', async () => {
+        const repository = await setup();
+
+        const result = await repository.searchOrganizationDocuments({
+          organizationId: 'org_1',
+          searchQuery: 'lorem',
+          pageIndex: 0,
+          pageSize: 10,
+          sort: { field: 'createdAt', order: 'asc' },
+        });
+
+        expect(ids(result).slice(0, 2)).to.eql(['doc_1', 'doc_4']);
+        expect(result.documentsCount).to.eql(5);
+      });
+
+      test('pagination is consistent across the pinned/unpinned boundary', async () => {
+        const repository = await setup();
+        const page = async (pageIndex: number) =>
+          repository.searchOrganizationDocuments({
+            organizationId: 'org_1',
+            searchQuery: '',
+            pageIndex,
+            pageSize: 2,
+            sort: { field: 'createdAt', order: 'desc' },
+          });
+
+        expect(ids(await page(0))).to.eql(['doc_4', 'doc_1']);
+        expect(ids(await page(1))).to.eql(['doc_5', 'doc_3']);
+        expect(ids(await page(2))).to.eql(['doc_2']);
+      });
+    });
+
     test('provides full text search on document name, original name, and content', async () => {
       const documents = [
         {

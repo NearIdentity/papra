@@ -8,7 +8,11 @@ import { isNonEmptyArray } from '../../../shared/arrays/arrays.utils';
 import { omit, omitUndefined } from '../../../shared/objects';
 import { documentsTable } from '../../documents.table';
 import { DEFAULT_DOCUMENT_SEARCH_SORT } from '../document-search.constants';
-import { makeSearchOrderByClauses, makeSearchWhereClause } from './database-fts5.repository.models';
+import {
+  isPinnedSql,
+  makeSearchOrderByClauses,
+  makeSearchWhereClause,
+} from './database-fts5.repository.models';
 import { documentsFtsTable } from './database-fts5.tables';
 import { buildFts5ColumnMatchTerm } from './database-fts5.models';
 
@@ -60,7 +64,11 @@ async function searchOrganizationDocuments({
 
   const paginatedIdsSubquery = db
     // selecting the sort value keeps it in the result set so the DISTINCT + ORDER BY of the paginated subquery stays unambiguous (the tag filters can otherwise produce duplicate rows per document)
-    .selectDistinct({ id: documentsTable.id, sortValue: sql`${sortColumn}`.as('sort_value') })
+    .selectDistinct({
+      id: documentsTable.id,
+      isPinned: sql`${isPinnedSql}`.as('is_pinned'),
+      sortValue: sql`${sortColumn}`.as('sort_value'),
+    })
     .from(documentsTable)
     .where(searchWhereClause)
     .orderBy(...orderByClauses)

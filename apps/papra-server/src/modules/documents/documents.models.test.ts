@@ -98,6 +98,7 @@ describe('documents models', () => {
             updatedAt: new Date('2025-01-01'),
             documentDate: new Date('2025-12-24'),
             notes: null,
+            pinnedAt: null,
           },
         }),
       ).to.eql({
@@ -117,6 +118,7 @@ describe('documents models', () => {
         updatedAt: new Date('2025-01-01'),
         documentDate: new Date('2025-12-24'),
         notes: null,
+        pinnedAt: null,
       });
     });
   });

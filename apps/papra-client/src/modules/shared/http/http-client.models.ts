@@ -4,7 +4,7 @@ export function getFormData(pojo: Record<string, string | Blob>): FormData {
   return formData;
 }
 
-type DateKeys = 'createdAt' | 'updatedAt' | 'deletedAt' | 'documentDate';
+type DateKeys = 'createdAt' | 'updatedAt' | 'deletedAt' | 'documentDate' | 'pinnedAt';
 
 type CoerceDate<T> = T extends string | Date
   ? Date
@@ -29,5 +29,6 @@ export function coerceDates<T extends Record<string, any>>(obj: T): CoerceDates<
     ...('lastUsedAt' in obj ? { lastUsedAt: toDate(obj.lastUsedAt) } : {}),
     ...('scheduledPurgeAt' in obj ? { scheduledPurgeAt: toDate(obj.scheduledPurgeAt) } : {}),
     ...('documentDate' in obj ? { documentDate: toDate(obj.documentDate) } : {}),
+    ...('pinnedAt' in obj ? { pinnedAt: toDate(obj.pinnedAt) } : {}),
   };
 }

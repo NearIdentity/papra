@@ -26,6 +26,7 @@ export const documentsTable = sqliteTable('documents', {
   content: text('content').notNull().default(''),
   documentDate: integer('document_date', { mode: 'timestamp_ms' }),
   notes: text('notes'),
+  pinnedAt: integer('pinned_at', { mode: 'timestamp_ms' }), // null when the document is not pinned
 
   fileEncryptionKeyWrapped: text('file_encryption_key_wrapped'), // The wrapped encryption key
   fileEncryptionKekVersion: text('file_encryption_kek_version'), // The key encryption key version used to encrypt the file encryption key

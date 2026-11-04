@@ -1,7 +1,7 @@
 import type { Database } from '../app/database/database.types';
 import type { DbInsertableDocument } from './documents.types';
 import { injectArguments, safely } from '@corentinth/chisels';
-import { and, count, desc, eq, inArray, lt, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import { createIterator } from '../app/database/database.usecases';
 import { createOrganizationNotFoundError } from '../organizations/organizations.errors';
 import { chunkArray } from '../shared/arrays/arrays.utils';
@@ -24,6 +24,8 @@ export function createDocumentsRepository({ db }: { db: Database }) {
       getDocumentById,
       softDeleteDocument,
       softDeleteDocuments,
+      pinDocuments,
+      unpinDocuments,
       getOrganizationDeletedDocumentsCount,
       restoreDocument,
       hardDeleteDocument,
@@ -197,6 +199,80 @@ async function softDeleteDocument({
 // Chunked to stay safely under SQLite's host parameter limit (default 32766)
 // when the documentIds list is large (e.g. resolved from a search query).
 const SOFT_DELETE_CHUNK_SIZE = 500;
+
+async function setDocumentsPinnedAt({
+  documentIds,
+  organizationId,
+  pinnedAt,
+  db,
+}: {
+  documentIds: string[];
+  organizationId: string;
+  pinnedAt: Date | null;
+  db: Database;
+}) {
+  const changedDocumentIds: string[] = [];
+
+  for (const idsChunk of chunkArray(documentIds, SOFT_DELETE_CHUNK_SIZE)) {
+    const rows = await db
+      .update(documentsTable)
+      .set({ pinnedAt })
+      .where(
+        and(
+          inArray(documentsTable.id, idsChunk),
+          eq(documentsTable.organizationId, organizationId),
+          eq(documentsTable.isDeleted, false),
+          // only rows whose pin state actually changes, so re-pinning keeps the original pin date
+          pinnedAt === null ? isNotNull(documentsTable.pinnedAt) : isNull(documentsTable.pinnedAt),
+        ),
+      )
+      .returning({ id: documentsTable.id });
+
+    changedDocumentIds.push(...rows.map((row) => row.id));
+  }
+
+  return { changedDocumentIds };
+}
+
+async function pinDocuments({
+  documentIds,
+  organizationId,
+  db,
+  now = new Date(),
+}: {
+  documentIds: string[];
+  organizationId: string;
+  db: Database;
+  now?: Date;
+}) {
+  const { changedDocumentIds } = await setDocumentsPinnedAt({
+    documentIds,
+    organizationId,
+    pinnedAt: now,
+    db,
+  });
+
+  return { pinnedDocumentIds: changedDocumentIds };
+}
+
+async function unpinDocuments({
+  documentIds,
+  organizationId,
+  db,
+}: {
+  documentIds: string[];
+  organizationId: string;
+  db: Database;
+}) {
+  const { changedDocumentIds } = await setDocumentsPinnedAt({
+    documentIds,
+    organizationId,
+    pinnedAt: null,
+    db,
+  });
+
+  return { unpinnedDocumentIds: changedDocumentIds };
+}
 
 async function softDeleteDocuments({
   documentIds,
