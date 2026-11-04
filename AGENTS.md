@@ -1,6 +1,6 @@
 # Papra: agent notes
 
-Verified against commit 93a569f. Items marked (unverified) were inferred; confirm in the code before relying on them. Update this file when you correct the agent twice about the same thing.
+Verified against upstream commit 93a569f (fork `aa-live-coding` adds docs and agent files, and may add other code updates at a later time). Items marked (unverified) were inferred; confirm in the code before relying on them. Update this file when you correct the agent twice about the same thing.
 
 ## Stack and layout
 - pnpm monorepo. Server: `apps/papra-server` (Hono, Drizzle + libSQL/SQLite, Better Auth, Valibot, CadenceMQ jobs; port 1221). Client: `apps/papra-client` (SolidJS, UnoCSS, Shadcn Solid; port 3000). Shared packages: `packages/{std,search-parser,lecture,webhooks}`. Docs: `apps/docs` (Astro Starlight).
@@ -12,7 +12,7 @@ Verified against commit 93a569f. Items marked (unverified) were inferred; confir
 3. Client: `cd apps/papra-client && pnpm dev`, then open http://localhost:3000.
 - Port 3000 must be free. If the client lands on 3001, login fails with "Invalid callbackURL".
 - After switching commits or branches: `pnpm dev:reset` in `apps/papra-server` (wipes local data).
-- Local AI: set `AI_IS_ENABLED=true` and `AI_DEFAULT_MODEL=<adapterId>://<model>` (for example `ollama://llama3.1:8b`) in `apps/papra-server/.env`. Auto-tagging also needs `config.autoTagging.isEnabled` and the organization setting `ai.autoTagging.isEnabled`. Adapter variables follow `<PREFIX>_BASE_URL` / `<PREFIX>_API_KEY` (prefix: see `openai-compatible.providers.ts`).
+- Local AI (put in `apps/papra-server/.env`, then restart the server): `AI_IS_ENABLED=true`, `AUTO_TAGGING_ENABLED=true`, `AI_DEFAULT_MODEL=<adapterId>://<model>` (for example `ollama://llama3.1:8b`; `AUTO_TAGGING_MODEL` also works). Ollama needs no other variables (defaults: `OLLAMA_BASE_URL=http://localhost:11434/v1`, key `ollama`; other OpenAI-compatible adapters use `<PREFIX>_BASE_URL` and `<PREFIX>_API_KEY`). Auto-tagging also needs the organization setting `ai.autoTagging.isEnabled` switched on in the client. The job is registered only if both server flags are true.
 - Test data: the "Devtools" button in the client (`apps/papra-client/src/modules/devtools`) generates fake documents.
 
 ## Verify before declaring done
