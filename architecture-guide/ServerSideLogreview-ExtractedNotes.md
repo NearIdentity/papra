@@ -143,3 +143,51 @@ Paths are under `apps/papra-server/src/modules/`.
 4. **Untruncated prompts.** `buildAutoTaggingUserPrompt` sends the whole extracted text.
 5. **`maxTags` is per response.** Reprocessing can add more tags over time; nothing caps a document's total.
 6. **Reprocess ignores the extraction switch.** Within the lines read, the reprocess route does not check `isContentExtractionEnabled`; upload does.
+
+
+### Ideas for further exploration
+
+#### Tagging
+
+- **Batch tagging path.** Read `tagDocumentsBatch` and `resolveBatchTargetDocumentIds`. The explicit-ID branch is still unverified: check that it filters by `organizationId` before mutating. Try the batch endpoint with an ID from another organization.
+- **Tag repository limits †.** The batch add/remove methods may build one large insert. Check whether they chunk against SQLite's bound-parameter limit, then test with a few thousand documents.
+- **Tagging rules.** Read `tagging-rules.usecases.ts` (it uses `safely` and swallows errors). Try a rule that matches nothing, a rule that matches everything, and two rules that add the same tag. Check what the activity log records for each.
+- **Tag deletion and renaming.** Find out what happens to document links when a tag is deleted, whether a rename emits an event, and whether the auto-tagging picklist picks up the new name.
+- **Tag limits.** `maxTagsPerOrganization` exists. Probe the boundary: creating the limit-plus-one tag via the API, via auto-tagging, and via a rule.
+
+#### Documents
+
+- **Upload edge cases.** Try a duplicate file, a zero-byte file, a very large file, an unsupported type, and a filename with odd characters. Compare the errors and what's left in storage after a failure.
+- **Trash and restore.** The reprocess route treats trashed documents as not found. Check what happens to tags, search entries and webhooks when a document is trashed, restored and permanently deleted (`DOCUMENTS_DELETED_DOCUMENTS_RETENTION_DAYS`).
+- **Encryption and storage keys.** Follow a file through storage with encryption on, and read the storage key patterns from the September commits (#1525 to #1529). A practice task is to rename a document and see what changes in the key.
+- **Content extraction †.** Read the `pdf:pdf-text` / `pdf:tesseract-js` / `text` extractor selection. Gaps to look for: a PDF with a mixed text layer, `DOCUMENTS_OCR_LANGUAGES` with multiple languages, and Word or image files.
+- **Reprocessing.** Fire the reprocess route repeatedly to see the rate limit and the 429 `Retry-After`. Check the missing `isContentExtractionEnabled` check (gap 6).
+
+#### Search
+
+- **`packages/search-parser`.** Read its tests, then the search use case that consumes it. Try queries with tag filters, quoted phrases and negation. Look for parser errors that surface as 500s.
+- **Index freshness.** The logs show `update-document-in-search-service` on `document.updated`. Check whether tag changes update the index, and whether tag-based search stays correct after a batch change.
+
+#### Events, webhooks and activity
+
+- **Event fan-out.** Read `events.handlers.ts` † and list every handler per event. Then trace `document.tags.changed` against the inline single-tag routes to confirm nothing fires twice.
+- **Webhooks.** Read `packages/webhooks` and the tag-changed handler †. Try a failing endpoint: does the job retry, back off or drop?
+- **Activity log.** Compare the entries from a manual tag, a rule tag and an auto-tag (`userId: undefined`). Check how the UI shows a change with no user.
+
+#### Auth, scoping and API
+
+- **Organization scoping audit.** Pick five routes and check each loads documents and tags by `organizationId`. 
+- **API key permissions.** The tags routes declare `apiKeyPermissions`. Try a key with only read access against a write route.
+- **Contract migration.** Documents routes are still the older Hono style. Migrating one small route to a contract (for example reprocess) is a realistic task that shows you can match conventions.
+
+#### Client
+
+- **Tag UI.** Find the tag components and the query invalidation after tag changes. Test a stale list after auto-tagging finishes, since the job runs after the upload response.
+- **Devtools tool registry.** Add a small devtools tool, such as generating a blank PDF to reproduce the empty-document case. It's low risk and pairs with gap 1.
+- **i18n.** Add a string with a key in `en.dictionary.ts` and check the fallback behaviour.
+
+#### Quality and tooling
+
+- **Test coverage map.** List modules with no colocated test, starting with `tagging-rules`, `auto-tagging.models.ts` and the batch tagging use case. Adding a test for `getTagsActions` is a small, safe rehearsal.
+- **Integration tests.** Run one `*.int.test.ts` if Docker is available, to know the cost and failure modes before the interview.
+
